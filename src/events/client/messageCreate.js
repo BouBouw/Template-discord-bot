@@ -2,7 +2,7 @@ const colors = require('colors');
 
 module.exports = {
 	name: 'messageCreate',
-	once: true,
+	once: false,  // CORRECTION: messageCreate doit s'exécuter à chaque message
 	execute: async (message, client) => {
         const prefix = '!'
 
@@ -20,10 +20,8 @@ module.exports = {
           
             if (!commandName.startsWith(prefix)) return;
             if (command) {
-                    message.delete().then(async () => {
-                        command.execute(client, message, args)
-                        console.log(`[COMMANDS] `.bold.red + `${prefix}${command.name}`.bold.blue + ` à été executée.`.bold.white)
-                    })
+                command.execute(client, message, args);
+                console.log(`[COMMANDS] `.bold.red + `${prefix}${command.name}`.bold.blue + ` à été executée.`.bold.white);
             }
         }
     }

@@ -1,59 +1,133 @@
 const { readdirSync } = require('fs');
+const { REST, Routes } = require('discord.js');
 const colors = require('colors');
 
 module.exports = (client) => {
-    // commands
-    const loadCommands = (dir = "./commands/") => {
-        readdirSync(dir).forEach(dirs => {
-          const commands = readdirSync(`${dir}/${dirs}/`).filter(files => files.endsWith(".js"));
+    // Utiliser le token depuis client.config (déjà chargé dans index.js)
+    const token = client.config?.token;
 
-          for (const files of commands) {
-            const getFileName = require(`../${dir}/${dirs}/${files}`);
-            client.commands.set(getFileName.name, getFileName);
-            console.log(`[COMMANDS]`.bold.red + ` Chargement de la commande :`.bold.white + ` ${getFileName.name}`.bold.red);
-            if(!commands) return console.log(`[COMMANDS]`.bold.red + `Aucune commande dans : `.bold.yellow + `${files}`.bold.red)
-          };
-        });
-    };
-    loadCommands()
-    console.log(`•----------•`.bold.black)
+    // ============================================
+    // 🎯 STRUCTURE UNIFIÉE - COMMANDS & SLASH
+    // ============================================
 
-    // slashCommands
     const arrayOfSlashCommands = [];
+    let commandsCount = 0;
+    let slashCommandsCount = 0;
 
-    const loadSlashCommands = (dir = "./slashCommands/") => {
-        readdirSync(dir).forEach(dirs => {
-            const commands = readdirSync(`${dir}/${dirs}/`).filter(files => files.endsWith(".js"));
+    // Charger les commandes depuis src/commands/
+    const loadCommands = (dir = "./src/commands/") => {
+        try {
+            const categories = readdirSync(dir);
 
-            for (const files of commands) {
-                const getFileName = require(`../${dir}/${dirs}/${files}`);
-                client.slashCommands.set(getFileName.name, getFileName);
-                console.log(`[SLASH COMMANDS]`.bold.red + ` Chargement de la slashCommand :`.bold.white + ` ${getFileName.name}`.bold.red);
-                arrayOfSlashCommands.push(getFileName);
+            categories.forEach(category => {
+                const commandsPath = `${dir}${category}/`;
+                const commandFiles = readdirSync(commandsPath).filter(files => files.endsWith(".js"));
+
+                for (const file of commandFiles) {
+                    const commandPath = `../${dir}${category}/${file}`;
+                    const command = require(commandPath);
+
+                    if (!command.name) {
+                        console.log(`[COMMANDS]`.bold.red + ` Erreur:`.bold.yellow + ` ${file} n'a pas de nom !`.bold.red);
+                        continue;
+                    }
+
+                    // Enregistrer dans client.commands (pour commandes classiques)
+                    client.commands.set(command.name, command);
+                    commandsCount++;
+
+                    // Si la commande a des données slash, l'enregistrer aussi
+                    if (command.slashData) {
+                        client.slashCommands.set(command.name, command);
+                        arrayOfSlashCommands.push(command.slashData.toJSON());
+                        slashCommandsCount++;
+
+                        console.log(`[UNIFIED]`.bold.magenta +
+                            ` [${category.padEnd(12)}]`.bold.white +
+                            ` ${command.name.padEnd(15)}`.bold.cyan +
+                            ` (prefix + slash)`.bold.green);
+                    } else {
+                        // Commande classique uniquement
+                        console.log(`[PREFIX]  `.bold.blue +
+                            ` [${category.padEnd(12)}]`.bold.white +
+                            ` ${command.name.padEnd(15)}`.bold.cyan);
+                    }
+                }
+            });
+        } catch (error) {
+            console.log(`[COMMANDS]`.bold.red + ` Erreur lors du chargement:`.bold.yellow, error.message);
+        }
+    };
+
+    loadCommands();
+    console.log(`•----------•`.bold.black);
+
+    // Afficher le résumé
+    console.log(`[LOADED]  `.bold.white +
+        `${commandsCount} commande(s)`.bold.green +
+        ` | ${slashCommandsCount} slash command(s)`.bold.cyan
+    );
+    console.log(`•----------•`.bold.black);
+
+    // Synchronisation avec l'API Discord v14
+    if (slashCommandsCount > 0) {
+        client.once('clientReady', async () => {
+            try {
+                console.log(`[API]`.bold.white + ` Synchronisation de `.bold.cyan + `${slashCommandsCount}`.bold.white + ` slash command(s)...`.bold.cyan);
+
+                const rest = new REST({ version: '10' }).setToken(token);
+
+                await rest.put(
+                    Routes.applicationCommands(client.user.id),
+                    { body: arrayOfSlashCommands }
+                );
+
+                console.log(`[API]`.bold.green + ` ✅ Commandes synchronisées avec succès !`.bold.white);
+            } catch (error) {
+                console.error(`[API]`.bold.red + ` ❌ Erreur lors de la synchronisation :`.bold.yellow, error.message);
             }
-        })
+        });
+    } else {
+        console.log(`[API]`.bold.yellow + ` ⚠️  Aucune slash command à synchroniser`.bold.white);
     }
-    loadSlashCommands();
+    console.log(`•----------•`.bold.black);
 
-    setTimeout(async () => {
-        console.log(`[API]`.bold.white + ` Synchronisation des commandes avec l'API de Discord.`.bold.green)
-        await client.application.commands.set(arrayOfSlashCommands);
-    }, 5000)
-    console.log(`•----------•`.bold.black)
+    // ============================================
+    // 📡 EVENTS
+    // ============================================
 
-    // events
-    const loadEvents = (dir = "./events/") => {
-        readdirSync(dir).forEach(dirs => {
-            const events = readdirSync(`${dir}/${dirs}`).filter(files => files.endsWith(".js"));
-      
-            for(const files of events) {
-                const getFileName = require(`../${dir}/${dirs}/${files}`)
-                client.on(getFileName.name, (...args) => getFileName.execute(...args, client))
-                console.log(`[EVENTS]`.bold.red + ` Chargement de l'evènement :`.bold.white + ` ${getFileName.name}`.bold.red);
-                if(!events) return console.log(`[EVENTS]`.bold.red + `Aucun évènement dans : `.bold.yellow + `${files}`.bold.red)
-            }
-        })
-    }
+    const loadEvents = (dir = "./src/events/") => {
+        try {
+            const categories = readdirSync(dir);
+
+            categories.forEach(category => {
+                const eventsPath = `${dir}${category}/`;
+                const eventFiles = readdirSync(eventsPath).filter(files => files.endsWith(".js"));
+
+                for (const file of eventFiles) {
+                    const eventPath = `../${dir}${category}/${file}`;
+                    const event = require(eventPath);
+
+                    if (!event.name) {
+                        console.log(`[EVENTS]`.bold.red + ` Erreur:`.bold.yellow + ` ${file} n'a pas de nom !`.bold.red);
+                        continue;
+                    }
+
+                    // Gestion de 'once' vs 'on' selon la propriété de l'event
+                    const emitter = event.once ? client.once.bind(client) : client.on.bind(client);
+                    emitter(event.name, (...args) => event.execute(...args, client));
+
+                    console.log(`[EVENTS] `.bold.red +
+                        ` [${category.padEnd(10)}] `.bold.white +
+                        `${event.name}`.bold.cyan
+                    );
+                }
+            });
+        } catch (error) {
+            console.log(`[EVENTS]`.bold.red + ` Erreur lors du chargement:`.bold.yellow, error.message);
+        }
+    };
+
     loadEvents();
-    console.log(`•----------•`.bold.black)
-}
+    console.log(`•----------•`.bold.black);
+};

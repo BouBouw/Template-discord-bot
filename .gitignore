@@ -1,2 +1,66 @@
-# Modules
-node_modules
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# Environment variables (sécurité!)
+.env
+.env.local
+.env.*.local
+
+# Config avec token
+config.json
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory
+coverage/
+.nyc_output/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Git worktrees (si vous utilisez .worktrees/)
+.worktrees/
+worktrees/
+
+# Documentation cache
+docs/plans/.cache/
